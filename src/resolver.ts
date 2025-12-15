@@ -1,5 +1,4 @@
 import { Node, SyntaxKind } from "ts-morph";
-import { assert } from "vitest";
 
 const validKindsInsideTypeAliasDeclaration = [
   SyntaxKind.BooleanKeyword,
@@ -21,7 +20,8 @@ export function Resolver(maxDepth: number = 20, enableDebug: boolean = true) {
     if (currentDepth >= maxDepth) throw new Error("MAX_DEPTH EXCEEDED");
     const newDepth = currentDepth + 1;
 
-    console.log(new Array(newDepth).join(" "), node.getKindName());
+    if (enableDebug)
+      console.log(new Array(newDepth).join(" "), node.getKindName());
 
     if (node.asKind(SyntaxKind.TypeAliasDeclaration)) {
       // assuming that TypeAliasDeclaration always have 5 childrens
