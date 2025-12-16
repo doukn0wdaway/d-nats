@@ -1,126 +1,175 @@
-import { Project, TypeAliasDeclaration } from "ts-morph";
+import {
+  MethodDeclaration,
+  Project,
+  SyntaxKind,
+  TypeReferenceNode,
+} from "ts-morph";
 import { Resolver } from "./resolver.js";
 import { expect, test } from "vitest";
 
-function simpleTest(sourceCode: string): TypeAliasDeclaration {
+function generateTypeReference(sourceCode: string): TypeReferenceNode {
   const project = new Project();
 
   const sourceFile = project.createSourceFile("temp.ts", sourceCode);
-  const aliases = sourceFile.getTypeAliases();
+  const aliases = sourceFile.getDescendantsOfKind(SyntaxKind.TypeReference);
   if (aliases.length < 1)
-    throw new Error("You must provide one typedefinition");
+    throw new Error("You must provide one type reference node");
 
   return aliases[0];
 }
 
-test("should resolve boolean", () => {
-  const resolve = Resolver();
-  expect(resolve(simpleTest("type Test = boolean;"))).toBe("boolean");
-});
-
-test("should resolve null", () => {
-  const resolve = Resolver();
-  expect(resolve(simpleTest("type Test = null;"))).toBe("null");
-});
-
-test("should resolve undefined", () => {
-  const resolve = Resolver();
-  expect(resolve(simpleTest("type Test = undefined;"))).toBe("undefined");
-});
-
-test("should resolve number", () => {
-  const resolve = Resolver();
-  expect(resolve(simpleTest("type Test = number;"))).toBe("number");
-});
-
-test("should resolve string", () => {
-  const resolve = Resolver();
-  expect(resolve(simpleTest("type Test = string;"))).toBe("string");
-});
-
-test("should resolve string literal", () => {
-  const resolve = Resolver();
-  expect(resolve(simpleTest('type Test = "something";'))).toBe('"something"');
-
-  expect(resolve(simpleTest('type Test = "3";'))).toBe('"3"');
-});
-
-test("should resolve basic unions", () => {
-  const resolve = Resolver();
-  expect(resolve(simpleTest("type Test =  undefined | null;"))).toBe(
-    "undefined | null",
-  );
-});
-
-test("should resolve basic intersections", () => {
-  const resolve = Resolver();
-  expect(resolve(simpleTest("type Test =  null & number;"))).toBe(
-    "null & number",
-  );
-});
-
-test("should resolve semi-complex type ", () => {
-  const resolve = Resolver();
-  expect(
-    resolve(simpleTest("type Test = {aboba: number; boba: string; };")),
-  ).toBe("{ aboba: number; boba: string; }");
-});
-
-test("should resolve type reference in the same file", () => {
-  const resolve = Resolver();
+const resolve = Resolver();
+test("should resolve single type from type reference", () => {
   expect(
     resolve(
-      simpleTest(
-        "type Test = {test2: Test2; boba: string; };\ntype Test2 = {aboba: number; boba: string; };",
+      generateTypeReference(
+        "function test():Test {return true}; type Test = boolean;",
       ),
     ),
-  ).toBe("{ test2: { aboba: number; boba: string; }; boba: string; }");
+  ).toBe("boolean");
 });
 
-test("should resolve type reference in the separate files", () => {
-  const resolve = Resolver();
+test("should resolve union from type reference", () => {
+  expect(
+    resolve(
+      generateTypeReference(
+        "function test():Test {return true}; type Test = boolean | number;",
+      ),
+    ),
+  ).toBe("boolean | number");
+});
 
+test("should resolve intersection from type reference", () => {
+  expect(
+    resolve(
+      generateTypeReference(
+        "function test():Test {return true}; type Test = boolean & number;",
+      ),
+    ),
+  ).toBe("boolean & number");
+});
+
+test("should resolve object type from type reference", () => {
+  expect(
+    resolve(
+      generateTypeReference(
+        "function test():Test {return {aboba: 3};}; type Test = { aboba: number };",
+      ),
+    ),
+  ).toBe("{ aboba: number; }");
+});
+
+test("should resolve type that references another type", () => {
+  expect(
+    resolve(
+      generateTypeReference(
+        "function test():Test {return {aboba: 3};}; type Test = { aboba: Test2 }; type Test2 = { boba: string };",
+      ),
+    ),
+  ).toBe("{ aboba: { boba: string; }; }");
+});
+
+test("should generate proper client", () => {
+  const resolve = Resolver(100, false);
+
+  const sourceCode = `
+import { EventPattern, MessagePattern } from '@nestjs/microservices';
+
+type User = { id: number; username: string };
+
+function handlePayment(id: string) {
+  console.log(id);
+}
+
+export class GatewayController {
+  @MessagePattern('getUserById')
+  getUser(id: string): User {
+    return { id: 2, username: 'user' };
+  }
+
+  @EventPattern('payment_created')
+  processPayment(paymentId: string) {
+    handlePayment(paymentId);
+  }
+}
+
+`;
   const project = new Project();
-
-  project.createSourceFile(
-    "temp1.ts",
-    `export type Test2 = {aboba: number; boba: string; };`,
+  const sourceFile = project.createSourceFile("temp.ts", sourceCode);
+  const methods = sourceFile.getClasses().flatMap((i) => i.getMethods());
+  const messagePatternMethods = methods.filter((i) =>
+    i.getDecorator("MessagePattern"),
   );
-  const sourceFile = project.createSourceFile(
-    "temp2.ts",
-    `import { Test2 } from './temp1';\ntype Test1 = {test2: Test2; boba: string; };`,
-    {},
+  const eventPatternMethods = methods.filter((i) =>
+    i.getDecorator("EventPattern"),
   );
-  const aliases = sourceFile.getTypeAliases();
 
-  if (aliases.length < 1)
-    throw new Error("You must provide one typedefinition");
+  // messagePatternMethods.forEach((i) => console.log(i.print()));
 
-  expect(resolve(aliases[0])).toBe(
-    "{ test2: { aboba: number; boba: string; }; boba: string; }",
-  );
+  function getDecoratorCallPattern(
+    node: MethodDeclaration,
+    decoratorName: string,
+  ): string {
+    const resolve = Resolver();
+    const decorator = node.getDecorator(decoratorName);
+    if (decorator) {
+      const unresolvedCallPattern = decorator.getDescendantsOfKind(
+        SyntaxKind.SyntaxList,
+      )?.[0];
+
+      if (unresolvedCallPattern) {
+        const callPattern = resolve(unresolvedCallPattern);
+        return callPattern;
+      }
+    }
+  }
+
+  messagePatternMethods.map((i) => {
+    let transformed: any = {};
+    const unresolvedReturnType = i.getChildrenOfKind(
+      SyntaxKind.TypeReference,
+    )?.[0];
+    if (unresolvedReturnType) {
+      const returnType = resolve(unresolvedReturnType);
+      transformed.returnType = returnType;
+    }
+
+    transformed.callPattern = getDecoratorCallPattern(i, "MessagePattern");
+
+    const methodName = i
+      .getChildrenOfKind(SyntaxKind.Identifier)?.[0]
+      .getText();
+    transformed.methodName = methodName;
+
+    const params = i.getParameters().map((i) => {
+      const type = resolve(i.getChildAtIndex(2));
+
+      const text = i.getChildAtIndex(0).getText();
+      return { text, type };
+    });
+
+    transformed.params = params;
+
+    // console.log(transformed);
+
+    console.log(`
+async ${transformed.methodName}(${transformed.params.map((i) => `${i.text}: ${i.type}`).join(" ")}):Promise<${transformed.returnType}>{
+    const result = await this.client.send(${transformed.callPattern}, [ ${transformed.params.map((i) => i.text).join(", ")} ]); 
+    return result;
+}`);
+  });
+
+  eventPatternMethods.map((i) => {
+    let transformed: any = {};
+    transformed.callPattern = getDecoratorCallPattern(i, "EventPattern");
+
+    const methodName = i
+      .getChildrenOfKind(SyntaxKind.Identifier)?.[0]
+      .getText();
+    transformed.methodName = methodName;
+
+    console.log(transformed);
+  });
 });
-
-// test("should resolve arrays", () => {
-//   const resolve = Resolver();
-//
-//   expect(
-//     resolve(
-//       simpleTest(
-//         "type Test = { num: number[]; }",
-//       ),
-//     ),
-//   ).toBe("number[]"); // INFO: or Array<number> actually? idk
-//
-//   expect(
-//     resolve(
-//       simpleTest(
-//         "type Test = { num: Array<number>; }",
-//       ),
-//     ),
-//   ).toBe("number[]"); // INFO: or Array<number> actually? idk
-//
-// });
-//
 
 // TODO: SUPPORT ARRAYS AND GENERICS maybe?
