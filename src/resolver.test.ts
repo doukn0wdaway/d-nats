@@ -124,7 +124,7 @@ export class GatewayController {
     }
   }
 
-  messagePatternMethods.map((i) => {
+  const transformed = messagePatternMethods.map((i) => {
     let transformed: any = {};
     const unresolvedReturnType = i.getChildrenOfKind(
       SyntaxKind.TypeReference,
@@ -152,12 +152,37 @@ export class GatewayController {
 
     // console.log(transformed);
 
-    console.log(`
-async ${transformed.methodName}(${transformed.params.map((i) => `${i.text}: ${i.type}`).join(" ")}):Promise<${transformed.returnType}>{
-    const result = await this.client.send(${transformed.callPattern}, [ ${transformed.params.map((i) => i.text).join(", ")} ]); 
-    return result;
-}`);
+    return `
+    async ${transformed.methodName}(${transformed.params.map((i) => `${i.text}: ${i.type}`).join(" ")}){
+        const observable = this.client.send<${transformed.returnType}>(${transformed.callPattern}, [ ${transformed.params.map((i) => i.text).join(", ")} ]); 
+        const res = await firstValueFrom(observable);
+        return res;
+    }`;
   });
+
+  project
+    .createSourceFile(
+      "./generated.ts",
+
+      `
+import { Injectable, Inject } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
+import { firstValueFrom } from 'rxjs';
+
+@Injectable()
+export class NatsClientService {
+  constructor(
+    @Inject('NATS_CLIENT') private readonly client: ClientProxy, // Инъекция стандартного клиента NATS
+  ) {}
+${transformed.join("\n")}
+}
+`,
+
+      {
+        overwrite: true,
+      },
+    )
+    .save();
 
   eventPatternMethods.map((i) => {
     let transformed: any = {};
