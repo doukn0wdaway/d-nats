@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
-    "module": "ESNext",
-    "target": "ES6",
-    "moduleResolution": "node"
-  }
+    "outDir": "dist",
+    "rootDir": "src",
+    "module": "NodeNext",
+    "target": "ES2022",
+    "moduleResolution": "NodeNext"
+  },
+  "exclude": ["**/*.test.ts"]
 }

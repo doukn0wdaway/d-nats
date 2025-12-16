@@ -1,6 +1,8 @@
-import { Command } from "commander";
-import * as fs from "fs/promises";
+#!/usr/bin/env node
+
 import z from "zod";
+import * as fs from "fs/promises";
+import { Command } from "commander";
 
 const defaultConfigPath = "./nestjs-nats-client-generator.json";
 const defaultConfig: Config = {

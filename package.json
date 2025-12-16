@@ -3,9 +3,13 @@
   "type": "module",
   "version": "1.0.0",
   "description": "",
+  "bin": {
+    "nats-generator": "dist/cli.js"
+  },
   "scripts": {
     "test": "vitest",
-    "start": "ts-node ./src/index.ts"
+    "dev": "ts-node ./src/cli.ts",
+    "build": "tsc"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +19,7 @@
     "prettier": "^3.7.4",
     "ts-morph": "^27.0.2",
     "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
     "zod": "^4.2.1"
   },
   "devDependencies": {
