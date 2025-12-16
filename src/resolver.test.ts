@@ -172,7 +172,7 @@ import { firstValueFrom } from 'rxjs';
 @Injectable()
 export class NatsClientService {
   constructor(
-    @Inject('NATS_CLIENT') private readonly client: ClientProxy, // Инъекция стандартного клиента NATS
+    @Inject('NATS_CLIENT') private readonly client: ClientProxy,
   ) {}
 ${transformed.join("\n")}
 }
