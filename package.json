@@ -1,10 +1,11 @@
 {
-  "name": "nats-generator",
+  "name": "d-nats",
   "type": "module",
+  "license": "Apache-2.0",
   "version": "1.0.0",
   "description": "",
   "bin": {
-    "nats-generator": "dist/cli.js"
+    "d-nats": "dist/cli.js"
   },
   "scripts": {
     "test": "vitest",

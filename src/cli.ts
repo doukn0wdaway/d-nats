@@ -4,7 +4,7 @@ import z from "zod";
 import * as fs from "fs/promises";
 import { Command } from "commander";
 
-const defaultConfigPath = "./nestjs-nats-client-generator.json";
+const defaultConfigPath = "./d-nats.json";
 const defaultConfig: Config = {
   tsconfig: "./tsconfig.json",
 };
@@ -57,7 +57,7 @@ function main() {
   let configPath = defaultConfigPath;
 
   program
-    .name("nestjs-nats-client-generator")
+    .name("d-nats")
     .description("Generates a NATS Client module by your nestjs project");
 
   program

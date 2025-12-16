@@ -1,7 +1,5 @@
 import { Node, SyntaxKind } from "ts-morph";
 
-const validAsFirstNode = [SyntaxKind.TypeReference, SyntaxKind.TypeLiteral];
-
 type Resolver = (node: Node, depth: number) => string;
 
 export function Resolver(maxDepth: number = 200, enableDebug: boolean = false) {
@@ -55,13 +53,6 @@ export function Resolver(maxDepth: number = 200, enableDebug: boolean = false) {
     if (enableDebug)
       console.log(new Array(currentDepth).join(" "), node.getKindName());
     if (currentDepth >= maxDepth) throw new Error("MAX_DEPTH EXCEEDED");
-
-    if (currentDepth === 0) {
-      if (!validAsFirstNode.includes(node.getKind()))
-        console.warn(
-          `[WARN]: probably ${node.getKindName()} is not valid starting node`,
-        );
-    }
 
     const newDepth = currentDepth + 1;
 

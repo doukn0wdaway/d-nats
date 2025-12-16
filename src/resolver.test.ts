@@ -7,6 +7,9 @@ import {
 import { Resolver } from "./resolver.js";
 import { expect, test } from "vitest";
 
+// TODO: SUPPORT ARRAYS, GENERICS
+// TODO: ADD TEST CASE WITH ZOD OR OTHER DTOS
+
 function generateTypeReference(sourceCode: string): TypeReferenceNode {
   const project = new Project();
 
@@ -87,6 +90,16 @@ export class GatewayController {
     return { id: 2, username: 'user' };
   }
 
+  @MessagePattern('getIdByUser')
+  getIdByUser(user: User): number {
+    return user.id;
+  }
+
+  @MessagePattern('getSomethingSpecial')
+  getSomethingSpecial({ user, boba }:{user: User, boba: number}): string {
+    return "im a creep, im a weirdo, what the hell i'm doing here"; 
+  }
+
   @EventPattern('payment_created')
   processPayment(paymentId: string) {
     handlePayment(paymentId);
@@ -122,13 +135,14 @@ export class GatewayController {
         return callPattern;
       }
     }
+    throw new Error(
+      `Declaration of ${decoratorName} decorator call pattern not found`,
+    );
   }
 
   const transformed = messagePatternMethods.map((i) => {
     let transformed: any = {};
-    const unresolvedReturnType = i.getChildrenOfKind(
-      SyntaxKind.TypeReference,
-    )?.[0];
+    const unresolvedReturnType = i.getReturnTypeNode();
     if (unresolvedReturnType) {
       const returnType = resolve(unresolvedReturnType);
       transformed.returnType = returnType;
@@ -142,7 +156,9 @@ export class GatewayController {
     transformed.methodName = methodName;
 
     const params = i.getParameters().map((i) => {
-      const type = resolve(i.getChildAtIndex(2));
+      const typeNode = i.getTypeNode();
+      if (!typeNode) return "not_implemented";
+      const type = resolve(typeNode);
 
       const text = i.getChildAtIndex(0).getText();
       return { text, type };
@@ -150,13 +166,40 @@ export class GatewayController {
 
     transformed.params = params;
 
-    // console.log(transformed);
-
+    const isParamsArray = transformed.params.length > 1;
     return `
     async ${transformed.methodName}(${transformed.params.map((i) => `${i.text}: ${i.type}`).join(" ")}){
-        const observable = this.client.send<${transformed.returnType}>(${transformed.callPattern}, [ ${transformed.params.map((i) => i.text).join(", ")} ]); 
+        const observable = this.client.send<${transformed.returnType}>(${transformed.callPattern}, ${isParamsArray ? "[" : ""}${transformed.params.map((i) => i.text).join(", ")}${isParamsArray ? "]" : ""} ); 
         const res = await firstValueFrom(observable);
         return res;
+    }`;
+  });
+
+  const transformedEventPatternMethods = eventPatternMethods.map((i) => {
+    let transformed: any = {};
+
+    transformed.callPattern = getDecoratorCallPattern(i, "EventPattern");
+
+    const methodName = i
+      .getChildrenOfKind(SyntaxKind.Identifier)?.[0]
+      .getText();
+    transformed.methodName = methodName;
+
+    const params = i.getParameters().map((i) => {
+      const typeNode = i.getTypeNode();
+      if (!typeNode) return "not_implemented";
+      const type = resolve(typeNode);
+
+      const text = i.getChildAtIndex(0).getText();
+      return { text, type };
+    });
+
+    transformed.params = params;
+
+    const isParamsArray = transformed.params.length > 1;
+    return `
+    ${transformed.methodName}(${transformed.params.map((i) => `${i.text}: ${i.type}`).join(" ")}){
+        this.client.emit(${transformed.callPattern}, ${isParamsArray ? "[" : ""}${transformed.params.map((i) => i.text).join(", ")}${isParamsArray ? "]" : ""}); 
     }`;
   });
 
@@ -164,8 +207,7 @@ export class GatewayController {
     .createSourceFile(
       "./generated.ts",
 
-      `
-import { Injectable, Inject } from '@nestjs/common';
+      `import { Injectable, Inject } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 
@@ -175,6 +217,7 @@ export class NatsClientService {
     @Inject('NATS_CLIENT') private readonly client: ClientProxy,
   ) {}
 ${transformed.join("\n")}
+${transformedEventPatternMethods.join("\n")}
 }
 `,
 
@@ -183,18 +226,4 @@ ${transformed.join("\n")}
       },
     )
     .save();
-
-  eventPatternMethods.map((i) => {
-    let transformed: any = {};
-    transformed.callPattern = getDecoratorCallPattern(i, "EventPattern");
-
-    const methodName = i
-      .getChildrenOfKind(SyntaxKind.Identifier)?.[0]
-      .getText();
-    transformed.methodName = methodName;
-
-    console.log(transformed);
-  });
 });
-
-// TODO: SUPPORT ARRAYS AND GENERICS maybe?
