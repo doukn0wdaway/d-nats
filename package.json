@@ -12,18 +12,21 @@
     "dev": "ts-node ./src/cli.ts",
     "build": "tsc"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "NATS",
+    "NestJS",
+    "Generator"
+  ],
+  "author": "doukn0wdaway",
   "dependencies": {
     "commander": "^14.0.2",
     "prettier": "^3.7.4",
     "ts-morph": "^27.0.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3",
     "zod": "^4.2.1"
   },
   "devDependencies": {
-    "vitest": "^4.0.15"
+    "vitest": "^4.0.15",
+    "typescript": "^5.9.3",
+    "ts-node": "^10.9.2"
   }
 }

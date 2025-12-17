@@ -6,6 +6,8 @@ Done:
 
 - [x] basic code generation
 - [x] Type resolver using ts-morph AST
+- [x] Support for arrays in the resolver
+- [x] Support for generics in the resolver
 
 In progress:
 
@@ -13,8 +15,8 @@ In progress:
 
 Todo:
 
-- [ ] Support for arrays in the resolver
-- [ ] Support for generics in the resolver
+- [ ] Test with some dto systems like ZOD, classtransformer, classvalidator
+- [ ] add max resolving depth and maybe some optimizations
 
 ---
 d stands for deez :)
